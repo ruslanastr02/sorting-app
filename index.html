@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<link rel="icon" type="image/png" href="favicon.png">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>bubble & friends • визуализация сортировки и поиска</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { min-height: 100vh; background: linear-gradient(145deg, #fff0f0 0%, #ffe4e0 100%); font-family: 'Inter', 'Segoe UI', system-ui, sans-serif; padding: 1.5rem; display: flex; justify-content: center; align-items: center; transition: background 0.3s ease; }
+body.dark { background: linear-gradient(145deg, #2d2d2d 0%, #1a1a1a 100%); }
+body.dark .card { background: rgba(30, 30, 35, 0.95); }
+body.dark .card, body.dark button, body.dark select, body.dark input, body.dark .select-row, body.dark .speed-box, body.dark .input-panel, body.dark .stats { background: #2a2a2a; color: #e0e0e0; border-color: #4a4a4a; }
+body.dark canvas { background: #1e1e1e; }
+body.dark .stat-badge, body.dark .search-result { background: #3a3a3a; color: #d4a574; }
+body.dark .btn-pink { background: #c97a64; }
+body.dark .btn-search { background: #5a8f7a; color: #fff; }
+.card { max-width: 1300px; width: 100%; background: rgba(255, 248, 245, 0.92); backdrop-filter: blur(4px); border-radius: 2rem; padding: 1.6rem 1.8rem 1.8rem; box-shadow: 0 20px 35px rgba(240, 128, 128, 0.15); }
+h1 { font-size: 1.8rem; font-weight: 650; color: #d4786c; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sub { color: #c78a7a; font-weight: 500; margin: 0.3rem 0 1.4rem 0; border-left: 3px solid #f3aa9a; padding-left: 0.8rem; font-size: 0.8rem; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 0.8rem; justify-content: space-between; margin-bottom: 1.5rem; }
+.btn-group { display: flex; gap: 0.7rem; flex-wrap: wrap; }
+button { background: #fff5f0; border: 1px solid #fdd6ca; padding: 0.5rem 1.3rem; font-weight: 600; font-size: 0.8rem; border-radius: 2rem; cursor: pointer; transition: 0.2s; color: #a56250; font-family: inherit; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-pink { background: #f3aa9a; color: white; border: none; }
+.btn-pink:hover { background: #ec927f; transform: translateY(-1px); }
+.btn-search { background: #a8d8ea; color: #2c5f6e; border: none; }
+.btn-step { background: #ffe4db; border-color: #f3aa9a; min-width: 100px; }
+.btn-step:not(:disabled):hover { background: #f3aa9a; color: white; }
+.select-row { display: flex; flex-wrap: wrap; gap: 0.6rem; background: #fffaf7; padding: 0.3rem 1rem; border-radius: 2.5rem; align-items: center; }
+.select-row label { font-weight: 600; color: #bd7b6a; font-size: 0.75rem; }
+select, input { background: white; border: 1px solid #f7cfc2; border-radius: 2rem; padding: 0.35rem 0.8rem; font-size: 0.75rem; font-family: monospace; outline: none; }
+.speed-box { display: flex; align-items: center; gap: 0.7rem; background: #fffaf7; padding: 0.2rem 1rem; border-radius: 2rem; }
+input[type="range"] { width: 130px; cursor: pointer; }
+.input-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; background: #fffaf7; padding: 0.4rem 1rem; border-radius: 2rem; margin-bottom: 1rem; }
+.search-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; background: #e6f4ea; padding: 0.4rem 1rem; border-radius: 2rem; margin-bottom: 1rem; border-left: 3px solid #7cb892; }
+.search-result { background: #d8f3dc; padding: 0.2rem 0.8rem; border-radius: 2rem; font-size: 0.75rem; color: #1b5e2a; }
+canvas { display: block; width: 100%; height: 360px; background: #fffcf9; border-radius: 1.5rem; margin: 0.5rem 0; cursor: pointer; }
+.stats { display: flex; justify-content: space-between; flex-wrap: wrap; margin-top: 0.8rem; padding: 0.5rem 1rem; background: #fff4ef; border-radius: 2rem; font-size: 0.75rem; font-weight: 500; color: #b25d4a; }
+.stat-badge { background: #ffe4db; padding: 0.2rem 0.8rem; border-radius: 2rem; }
+.step-indicator { font-family: monospace; font-size: 0.7rem; color: #b95c4a; }
+footer { text-align: center; margin-top: 1rem; font-size: 0.65rem; color: #d99e8a; }
+.speed-value { font-weight: bold; color: #f3aa9a; }
+</style>
+</head>
+<body>
+<div class="card">
+<h1>🦔 bubble & friends · сортировка и поиск</h1>
+<div class="sub">визуализация алгоритмов + пошаговый режим (пауза → шаги)</div>
+<div class="toolbar">
+<div class="btn-group">
+<button id="startBtn" class="btn-pink">▶ запуск</button>
+<button id="resetBtn">⟳ сброс</button>
+<button id="shuffleBtn">🎲 перемешать</button>
+<button id="themeBtn">🌙 темная тема</button>
+</div>
+<div class="select-row">
+<label>алгоритм</label>
+<select id="algoType">
+<option value="bubble">🫧 пузырьковая</option>
+<option value="selection">🎯 выбором</option>
+<option value="insertion">📌 вставками</option>
+<option value="quick">⚡ быстрая</option>
+</select>
+<label>порядок</label>
+<select id="orderType">
+<option value="asc">📈 возрастание</option>
+<option value="desc">📉 убывание</option>
+</select>
+<label>вид</label>
+<select id="vizType">
+<option value="bars">🎀 столбцы</option>
+<option value="graph">📈 граф</option>
+<option value="creatures">🦔 ежи и лисы</option>
+</select>
+</div>
+<div class="speed-box">
+<label>⚡ скорость</label>
+<input type="range" id="speedSlider" min="0" max="200" value="100">
+<span id="speedVal" class="stat-badge">80ms</span>
+</div>
+</div>
+
+<div class="btn-group" style="margin-bottom: 1rem; justify-content: center;">
+<button id="stepBackBtn" class="btn-step" disabled>⏪ шаг назад</button>
+<button id="pauseBtn" class="btn-step" disabled>⏸ пауза</button>
+<button id="stepForwardBtn" class="btn-step" disabled>⏩ шаг вперед</button>
+</div>
+
+<div class="input-panel">
+<span>✏️ свои числа (через , ):</span>
+<input type="text" id="customArr" placeholder="23, 65, 12, 88, 41" style="width: 180px;">
+<button id="applyCustom">применить</button>
+<span>🎲 случайных n=</span>
+<input type="number" id="randSize" value="14" min="4" max="32" style="width: 65px;">
+<button id="genRandom">сгенерировать</button>
+</div>
+
+<div class="search-panel">
+<span>🔍 ПОИСК:</span>
+<input type="number" id="searchValue" placeholder="число" style="width: 90px;" value="52">
+<button id="linearSearchBtn" class="btn-search">📋 линейный</button>
+<button id="binarySearchBtn" class="btn-search">🔎 бинарный</button>
+<span id="searchResult" class="search-result">⚡ готов</span>
+<button id="clearSearchBtn">✖ очистить</button>
+</div>
+
+<canvas id="sortCanvas" width="1000" height="360"></canvas>
+<div class="stats">
+<span>💭 состояние: <span id="stateLabel" class="stat-badge">готов</span></span>
+<span>🔄 сравнения: <span id="cmpCount">0</span> &nbsp;|&nbsp; 🔁 обмены: <span id="swpCount">0</span></span>
+<span>📦 элементов: <span id="lenCount">14</span></span>
+<span id="stepIndicator" class="step-indicator"></span>
+</div>
+<footer>🔹 Изменяй скорость ПОЛЗУНКОМ ДО или ВО ВРЕМЯ сортировки 🔹</footer>
+</div>
+
+<script>
+// Начальные данные
+let defaultArray = [45, 28, 74, 13, 52, 39, 85, 21, 63, 34, 77, 9, 48, 31];
+let currentArr = [...defaultArray];
+let sortOrder = "asc";
+let sortingActive = false;
+let paused = false;
+let comparisons = 0, swaps = 0;
+let speedMs = 80;
+let searchHighlights = [];
+let darkMode = false;
+
+// Для пошагового режима
+let stepHistory = [];
+let currentStepIndex = -1;
+let sortGenerator = null;
+let animationInterval = null;
+
+// DOM элементы
+const canvas = document.getElementById('sortCanvas');
+const ctx = canvas.getContext('2d');
+const startBtn = document.getElementById('startBtn');
+const resetBtn = document.getElementById('resetBtn');
+const shuffleBtn = document.getElementById('shuffleBtn');
+const themeBtn = document.getElementById('themeBtn');
+const algoSelect = document.getElementById('algoType');
+const orderSelect = document.getElementById('orderType');
+const vizSelect = document.getElementById('vizType');
+const speedSlider = document.getElementById('speedSlider');
+const speedSpan = document.getElementById('speedVal');
+const stateSpan = document.getElementById('stateLabel');
+const cmpSpan = document.getElementById('cmpCount');
+const swpSpan = document.getElementById('swpCount');
+const lenSpan = document.getElementById('lenCount');
+const customInput = document.getElementById('customArr');
+const applyCustomBtn = document.getElementById('applyCustom');
+const genRandomBtn = document.getElementById('genRandom');
+const randSizeInput = document.getElementById('randSize');
+const searchValueInput = document.getElementById('searchValue');
+const linearSearchBtn = document.getElementById('linearSearchBtn');
+const binarySearchBtn = document.getElementById('binarySearchBtn');
+const searchResultSpan = document.getElementById('searchResult');
+const clearSearchBtn = document.getElementById('clearSearchBtn');
+const stepBackBtn = document.getElementById('stepBackBtn');
+const stepForwardBtn = document.getElementById('stepForwardBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+
+// Обновление скорости - теперь динамическое!
+function updateSpeed() {
+    let raw = parseInt(speedSlider.value, 10);
+    // Преобразуем: ползунок вправо = меньше задержка (быстрее)
+    // max 200ms (медленно) - min 10ms (быстро)
+    speedMs = Math.max(10, 200 - raw);
+    speedSpan.innerText = speedMs + "ms";
+    
+    // Если сортировка активна и не на паузе, перезапускаем анимацию с новой скоростью
+    if (sortingActive && !paused && animationInterval) {
+        restartAnimation();
+    }
+}
+speedSlider.addEventListener('input', updateSpeed);
+updateSpeed();
+
+// Перезапуск анимации с новой скоростью
+function restartAnimation() {
+    if (animationInterval) {
+        clearInterval(animationInterval);
+    }
+    
+    animationInterval = setInterval(() => {
+        if (!sortingActive || paused) return;
+        
+        if (currentStepIndex < stepHistory.length - 1) {
+            currentStepIndex++;
+            loadStep(currentStepIndex);
+        } else {
+            stopSort();
+            stateSpan.innerText = "отсортировано ✨";
+            pauseBtn.disabled = true;
+            stepForwardBtn.disabled = true;
+        }
+    }, speedMs);
+}
+
+function updateCounters() {
+    cmpSpan.innerText = comparisons;
+    swpSpan.innerText = swaps;
+}
+
+// Отрисовка
+function draw() {
+    if (!ctx) return;
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    canvas.width = w;
+    canvas.height = h;
+    if (w === 0 || currentArr.length === 0) return;
+    
+    const maxVal = Math.max(...currentArr, 1);
+    const step = (w - 70) / currentArr.length;
+    const startX = 35;
+    const mode = vizSelect.value;
+    
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = darkMode ? "#1e1e1e" : "#fffcf9";
+    ctx.fillRect(0, 0, w, h);
+    
+    for (let i = 0; i < currentArr.length; i++) {
+        let val = currentArr[i];
+        let x = startX + i * step;
+        let barHeight = (val / maxVal) * (h - 90);
+        let yTop = h - 35 - barHeight;
+        
+        let color = darkMode ? "#5a4a4a" : "#ffe2d4";
+        if (searchHighlights.includes(i)) color = "#a8e6cf";
+        
+        if (mode === "bars") {
+            ctx.fillStyle = color;
+            ctx.fillRect(x, yTop, Math.max(5, step-5), barHeight);
+            ctx.fillStyle = darkMode ? "#d4a574" : "#b9735c";
+            ctx.font = "bold 11px 'Segoe UI'";
+            ctx.fillText(val, x+3, yTop-4);
+        } else if (mode === "graph") {
+            let cx = x + step/2;
+            let cy = yTop + barHeight/2;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 7, 0, Math.PI*2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.fillStyle = darkMode ? "#d4a574" : "#9d604b";
+            ctx.font = "bold 11px monospace";
+            ctx.fillText(val, cx-6, cy+4);
+        } else if (mode === "creatures") {
+            let cx = x + step/2;
+            let cy = yTop + barHeight/2;
+            ctx.fillStyle = i % 2 === 0 ? "#cb8b6a" : "#f0a97a";
+            ctx.beginPath();
+            ctx.ellipse(cx-2, cy-3, 10, 9, 0, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = "#7d4d39";
+            ctx.font = "bold 10px 'Segoe UI'";
+            ctx.fillText(val, cx-7, cy-12);
+        }
+    }
+    
+    ctx.fillStyle = darkMode ? "#d4a574" : "#c9816b";
+    ctx.font = "9px monospace";
+    for (let i = 0; i < currentArr.length; i++) {
+        let x = startX + i * step;
+        ctx.fillText(i, x+step/2-3, canvas.height-12);
+    }
+}
+
+// Функция сравнения с учетом порядка сортировки
+function needSwap(a, b) {
+    if (sortOrder === "asc") {
+        return a > b;
+    } else {
+        return a < b;
+    }
+}
+
+// ГЕНЕРАТОРЫ ШАГОВ ДЛЯ КАЖДОГО АЛГОРИТМА
+
+function* bubbleSortGenerator() {
+    let arr = [...currentArr];
+    let n = arr.length;
+    let localComps = 0;
+    let localSwaps = 0;
+    
+    for (let i = 0; i < n-1; i++) {
+        let swapped = false;
+        for (let j = 0; j < n-i-1; j++) {
+            yield { arr: [...arr], comparisons: localComps, swaps: localSwaps, highlight: [j, j+1] };
+            localComps++;
+            if (needSwap(arr[j], arr[j+1])) {
+                [arr[j], arr[j+1]] = [arr[j+1], arr[j]];
+                localSwaps++;
+                swapped = true;
+                yield { arr: [...arr], comparisons: localComps, swaps: localSwaps, highlight: [j, j+1] };
+            }
+        }
+        if (!swapped) break;
+    }
+    yield { arr: [...arr], comparisons: localComps, swaps: localSwaps, highlight: [] };
+}
+
+function* selectionSortGenerator() {
+    let arr = [...currentArr];
+    let n = arr.length;
+    let localComps = 0;
+    let localSwaps = 0;
+    
+    for (let i = 0; i < n-1; i++) {
+        let idx = i;
+        for (let j = i+1; j < n; j++) {
+            yield { arr: [...arr], comparisons: localComps, swaps: localSwaps, highlight: [idx, j] };
+            localComps++;
+            if (needSwap(arr[idx], arr[j])) {
+                idx = j;
+            }
+        }
+        if (idx !== i) {
+            [arr[i], arr[idx]] = [arr[idx], arr[i]];
+            localSwaps++;
+            yield { arr: [...arr], comparisons: localComps, swaps: localSwaps, highlight: [i, idx] };
+        }
+    }
+    yield { arr: [...arr], comparisons: localComps, swaps: localSwaps, highlight: [] };
+}
+
+function* insertionSortGenerator() {
+    let arr = [...currentArr];
+    let localComps = 0;
+    let localSwaps = 0;
+    
+    for (let i = 1; i < arr.length; i++) {
+        let key = arr[i];
+        let j = i-1;
+        while (j >= 0 && needSwap(arr[j], key)) {
+            yield { arr: [...arr], comparisons: localComps, swaps: localSwaps, highlight: [j, j+1] };
+            localComps++;
+            arr[j+1] = arr[j];
+            localSwaps++;
+            j--;
+        }
+        arr[j+1] = key;
+        yield { arr: [...arr], comparisons: localComps, swaps: localSwaps, highlight: [j+1] };
+    }
+    yield { arr: [...arr], comparisons: localComps, swaps: localSwaps, highlight: [] };
+}
+
+function* quickSortGenerator() {
+    let arr = [...currentArr];
+    let localComps = 0;
+    let localSwaps = 0;
+    
+    function* partitionGen(low, high) {
+        let pivot = arr[high];
+        let i = low - 1;
+        for (let j = low; j < high; j++) {
+            yield { arr: [...arr], comparisons: localComps, swaps: localSwaps, highlight: [j, high] };
+            localComps++;
+            if (sortOrder === "asc" ? arr[j] <= pivot : arr[j] >= pivot) {
+                i++;
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+                if (i !== j) localSwaps++;
+                yield { arr: [...arr], comparisons: localComps, swaps: localSwaps, highlight: [i, j] };
+            }
+        }
+        [arr[i+1], arr[high]] = [arr[high], arr[i+1]];
+        if (i+1 !== high) localSwaps++;
+        yield { arr: [...arr], comparisons: localComps, swaps: localSwaps, highlight: [i+1, high] };
+        return i+1;
+    }
+    
+    function* quickHelperGen(low, high) {
+        if (low < high) {
+            let pi = yield* partitionGen(low, high);
+            yield* quickHelperGen(low, pi-1);
+            yield* quickHelperGen(pi+1, high);
+        }
+    }
+    
+    yield* quickHelperGen(0, arr.length-1);
+    yield { arr: [...arr], comparisons: localComps, swaps: localSwaps, highlight: [] };
+}
+
+function getGenerator() {
+    switch(algoSelect.value) {
+        case 'bubble': return bubbleSortGenerator();
+        case 'selection': return selectionSortGenerator();
+        case 'insertion': return insertionSortGenerator();
+        case 'quick': return quickSortGenerator();
+        default: return bubbleSortGenerator();
+    }
+}
+
+// Запуск сортировки
+async function startSort() {
+    if (sortingActive) {
+        stopSort();
+        return;
+    }
+    
+    sortingActive = true;
+    paused = false;
+    comparisons = 0;
+    swaps = 0;
+    sortOrder = orderSelect.value;
+    searchHighlights = [];
+    updateCounters();
+    
+    sortGenerator = getGenerator();
+    stepHistory = [];
+    for (let step of sortGenerator) {
+        stepHistory.push(step);
+    }
+    currentStepIndex = 0;
+    
+    loadStep(0);
+    
+    stateSpan.innerText = "сортировка...";
+    pauseBtn.disabled = false;
+    pauseBtn.textContent = "⏸ пауза";
+    stepBackBtn.disabled = true;
+    stepForwardBtn.disabled = false;
+    
+    startAnimation();
+}
+
+function startAnimation() {
+    if (animationInterval) clearInterval(animationInterval);
+    
+    animationInterval = setInterval(() => {
+        if (!sortingActive || paused) return;
+        
+        if (currentStepIndex < stepHistory.length - 1) {
+            currentStepIndex++;
+            loadStep(currentStepIndex);
+        } else {
+            stopSort();
+            stateSpan.innerText = "отсортировано ✨";
+            pauseBtn.disabled = true;
+            stepForwardBtn.disabled = true;
+        }
+    }, speedMs);
+}
+
+function stopSort() {
+    sortingActive = false;
+    paused = false;
+    if (animationInterval) {
+        clearInterval(animationInterval);
+        animationInterval = null;
+    }
+    pauseBtn.textContent = "⏸ пауза";
+    pauseBtn.disabled = true;
+    stepBackBtn.disabled = true;
+    stepForwardBtn.disabled = true;
+}
+
+function loadStep(index) {
+    if (index < 0 || index >= stepHistory.length) return;
+    
+    let step = stepHistory[index];
+    currentArr = [...step.arr];
+    comparisons = step.comparisons;
+    swaps = step.swaps;
+    updateCounters();
+    draw();
+    
+    currentStepIndex = index;
+    updateStepButtons();
+    updateStepIndicator();
+}
+
+function updateStepButtons() {
+    if (!sortingActive) {
+        stepBackBtn.disabled = true;
+        stepForwardBtn.disabled = true;
+        return;
+    }
+    stepBackBtn.disabled = currentStepIndex <= 0;
+    stepForwardBtn.disabled = currentStepIndex >= stepHistory.length - 1;
+}
+
+function updateStepIndicator() {
+    const indicator = document.getElementById('stepIndicator');
+    if (sortingActive && stepHistory.length > 0) {
+        indicator.innerText = ` | шаг ${currentStepIndex + 1}/${stepHistory.length}`;
+    } else {
+        indicator.innerText = '';
+    }
+}
+
+function pauseSort() {
+    if (!sortingActive) return;
+    paused = !paused;
+    pauseBtn.textContent = paused ? "▶ продолжить" : "⏸ пауза";
+    stateSpan.innerText = paused ? "на паузе" : "сортировка...";
+}
+
+function stepBack() {
+    if (!sortingActive) return;
+    
+    // Если не на паузе, ставим на паузу
+    if (!paused) {
+        paused = true;
+        pauseBtn.textContent = "▶ продолжить";
+        stateSpan.innerText = "на паузе";
+    }
+    
+    if (currentStepIndex > 0) {
+        currentStepIndex--;
+        loadStep(currentStepIndex);
+    }
+}
+
+function stepForward() {
+    if (!sortingActive) return;
+    
+    // Если не на паузе, ставим на паузу
+    if (!paused) {
+        paused = true;
+        pauseBtn.textContent = "▶ продолжить";
+        stateSpan.innerText = "на паузе";
+    }
+    
+    if (currentStepIndex < stepHistory.length - 1) {
+        currentStepIndex++;
+        loadStep(currentStepIndex);
+    }
+}
+
+// ============ ПОИСК ============
+
+async function linearSearch() {
+    if (sortingActive) {
+        searchResultSpan.innerText = "⏳ останови сортировку";
+        return;
+    }
+    
+    let target = parseInt(searchValueInput.value);
+    if (isNaN(target)) {
+        searchResultSpan.innerText = "❌ введите число";
+        return;
+    }
+    
+    stateSpan.innerText = "линейный поиск...";
+    searchHighlights = [];
+    
+    for (let i = 0; i < currentArr.length; i++) {
+        searchHighlights = [i];
+        draw();
+        await sleep(200);
+        
+        if (currentArr[i] === target) {
+            searchResultSpan.innerText = `✅ найдено! индекс ${i} (значение ${currentArr[i]})`;
+            stateSpan.innerText = "найдено";
+            return;
+        }
+    }
+    
+    searchHighlights = [];
+    draw();
+    searchResultSpan.innerText = `❌ элемент ${target} не найден`;
+    stateSpan.innerText = "не найдено";
+}
+
+async function binarySearch() {
+    if (sortingActive) {
+        searchResultSpan.innerText = "⏳ останови сортировку";
+        return;
+    }
+    
+    let target = parseInt(searchValueInput.value);
+    if (isNaN(target)) {
+        searchResultSpan.innerText = "❌ введите число";
+        return;
+    }
+    
+    // Для бинарного поиска нужно создать отсортированную копию с сохранением оригинальных индексов
+    let indexedArray = currentArr.map((value, index) => ({ value, originalIndex: index }));
+    indexedArray.sort((a, b) => a.value - b.value);
+    
+    stateSpan.innerText = "бинарный поиск...";
+    searchHighlights = [];
+    
+    let left = 0;
+    let right = indexedArray.length - 1;
+    let foundOriginalIndex = -1;
+    
+    while (left <= right) {
+        let mid = Math.floor((left + right) / 2);
+        
+        searchHighlights = [indexedArray[mid].originalIndex];
+        draw();
+        await sleep(300);
+        
+        if (indexedArray[mid].value === target) {
+            foundOriginalIndex = indexedArray[mid].originalIndex;
+            break;
+        } else if (indexedArray[mid].value < target) {
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
+    
+    if (foundOriginalIndex !== -1) {
+        searchHighlights = [foundOriginalIndex];
+        draw();
+        searchResultSpan.innerText = `✅ найдено! индекс ${foundOriginalIndex} (значение ${currentArr[foundOriginalIndex]})`;
+        stateSpan.innerText = "найдено";
+    } else {
+        searchHighlights = [];
+        draw();
+        searchResultSpan.innerText = `❌ элемент ${target} не найден`;
+        stateSpan.innerText = "не найдено";
+    }
+}
+
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function clearSearchHighlight() {
+    searchHighlights = [];
+    searchResultSpan.innerText = "⚡ очищено";
+    draw();
+}
+
+// Управление массивом
+function resetArray() {
+    if (sortingActive) stopSort();
+    currentArr = [...defaultArray];
+    comparisons = 0;
+    swaps = 0;
+    searchHighlights = [];
+    updateCounters();
+    stateSpan.innerText = "сброс";
+    lenSpan.innerText = currentArr.length;
+    draw();
+}
+
+function shuffleArray() {
+    if (sortingActive) stopSort();
+    for (let i = currentArr.length - 1; i > 0; i--) {
+        let j = Math.floor(Math.random() * (i + 1));
+        [currentArr[i], currentArr[j]] = [currentArr[j], currentArr[i]];
+    }
+    comparisons = 0;
+    swaps = 0;
+    searchHighlights = [];
+    updateCounters();
+    stateSpan.innerText = "перемешано";
+    draw();
+}
+
+function applyCustom() {
+    if (sortingActive) stopSort();
+    let raw = customInput.value.trim();
+    if (!raw) return;
+    let parts = raw.split(',').map(v => parseInt(v, 10));
+    if (parts.some(isNaN) || parts.length < 2) {
+        stateSpan.innerText = "ошибка ввода";
+        return;
+    }
+    currentArr = parts.slice();
+    lenSpan.innerText = currentArr.length;
+    comparisons = 0;
+    swaps = 0;
+    searchHighlights = [];
+    updateCounters();
+    stateSpan.innerText = "свой массив";
+    draw();
+}
+
+function genRandom() {
+    if (sortingActive) stopSort();
+    let n = parseInt(randSizeInput.value, 10);
+    if (isNaN(n)) n = 12;
+    n = Math.min(32, Math.max(4, n));
+    currentArr = Array.from({ length: n }, () => Math.floor(Math.random() * 84) + 8);
+    lenSpan.innerText = currentArr.length;
+    comparisons = 0;
+    swaps = 0;
+    searchHighlights = [];
+    updateCounters();
+    stateSpan.innerText = "случайные";
+    draw();
+}
+
+function toggleTheme() {
+    darkMode = !darkMode;
+    document.body.classList.toggle('dark', darkMode);
+    themeBtn.textContent = darkMode ? '☀️ светлая' : '🌙 темная';
+    draw();
+}
+
+// Обработчики
+startBtn.addEventListener('click', startSort);
+resetBtn.addEventListener('click', resetArray);
+shuffleBtn.addEventListener('click', shuffleArray);
+themeBtn.addEventListener('click', toggleTheme);
+applyCustomBtn.addEventListener('click', applyCustom);
+genRandomBtn.addEventListener('click', genRandom);
+linearSearchBtn.addEventListener('click', linearSearch);
+binarySearchBtn.addEventListener('click', binarySearch);
+clearSearchBtn.addEventListener('click', clearSearchHighlight);
+pauseBtn.addEventListener('click', pauseSort);
+stepBackBtn.addEventListener('click', stepBack);
+stepForwardBtn.addEventListener('click', stepForward);
+orderSelect.addEventListener('change', () => {
+    stateSpan.innerText = "порядок изменён";
+    if (sortingActive) stopSort();
+});
+vizSelect.addEventListener('change', () => draw());
+window.addEventListener('resize', () => draw());
+
+// Инициализация
+function init() {
+    currentArr = [...defaultArray];
+    lenSpan.innerText = currentArr.length;
+    draw();
+    stateSpan.innerText = "готово";
+}
+init();
+</script>
+</body>
+</html>
